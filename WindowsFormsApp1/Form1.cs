@@ -77,7 +77,7 @@ namespace WindowsFormsApp1
                 readInitialExcelFile(filePath);
             }
         }
-        private void button2_Click(object sender, EventArgs e)
+        private void button2_Click_1(object sender, EventArgs e)
         {
             //open file dialog, search for excel file, and get the path of the file
             OpenFileDialog openFileDialog2 = new OpenFileDialog();
@@ -98,23 +98,29 @@ namespace WindowsFormsApp1
             //workbook.Close(false);
             //excelApp.Quit();
         }
-        private void readEndExcelFile(string filePath)
+        private void readEndExcelFile(string filePath2)
         {
             excelApp = new Microsoft.Office.Interop.Excel.Application();
-            workbook2 = excelApp.Workbooks.Open(filePath);
-            worksheet2 = workbook.Sheets[1];
+            workbook2 = excelApp.Workbooks.Open(filePath2);
+            worksheet2 = workbook2.Sheets[1];
 
 
             //workbook.Close(false);
             //excelApp.Quit();
         }
+
+        private int GetLastPopulatedRow(Worksheet sheet, int column)
+        {
+            return sheet.Cells[sheet.Rows.Count, column].End(XlDirection.xlUp).Row;
+        }
+
         private void kiszhFunction()
         {
             //read the values from the numericUpDowns and write them to the excel file
             int startColumn = (int)numericUpDown1.Value;
             int endColumn = (int)numericUpDown2.Value;
 
-            for (int i = 4; i <= worksheet.Rows.Count; i++)
+            for (int i = 4; i <= GetLastPopulatedRow(worksheet, 3); i++)
             {
                 object neptunCodeValue = worksheet.Cells[i, 3].Value2;
                 if (neptunCodeValue == null)
@@ -132,6 +138,32 @@ namespace WindowsFormsApp1
                 kisZhValuesByNeptunCode[neptunCode] = values;
 
             }
+            var destinationRowsByNeptunCode = new Dictionary<string, int>();
+            int lastDestinationRow = GetLastPopulatedRow(worksheet2, 2);
+            for (int i = 2; i <= lastDestinationRow; i++)
+            {
+                object neptunCodeValue = worksheet2.Cells[i, 2].Value2;
+                if (neptunCodeValue != null)
+                {
+                    string neptunCode = neptunCodeValue.ToString();
+                    if (!destinationRowsByNeptunCode.ContainsKey(neptunCode))
+                    {
+                        destinationRowsByNeptunCode[neptunCode] = i;
+                    }
+                }
+            }
+
+            foreach (var kvp in kisZhValuesByNeptunCode)
+            {
+                if (destinationRowsByNeptunCode.TryGetValue(kvp.Key, out int destinationRow))
+                {
+                    List<object> values = kvp.Value;
+                    for (int j = 0; j < values.Count; j++)
+                    {
+                        worksheet2.Cells[destinationRow, 15 + j].Value2 = values[j];
+                    }
+                }
+            }
 
         }
         private void nagyzhFunction()
@@ -139,7 +171,7 @@ namespace WindowsFormsApp1
             //read the values from the numericUpDowns and write them to the excel file
             int startColumn = (int)numericUpDown3.Value;
             int endColumn = (int)numericUpDown4.Value;
-            for (int i = 4; i <= worksheet.Rows.Count; i++)
+            for (int i = 4; i <= GetLastPopulatedRow(worksheet, 3); i++)
             {
                 object neptunCodeValue = worksheet.Cells[i, 3].Value2;
                 if (neptunCodeValue == null)
@@ -163,7 +195,7 @@ namespace WindowsFormsApp1
             //read the values from the numericUpDowns and write them to the excel file
             int startColumn = (int)numericUpDown5.Value;
             int endColumn = (int)numericUpDown6.Value;
-            for (int i = 4; i <= worksheet.Rows.Count; i++)
+            for (int i = 4; i <= GetLastPopulatedRow(worksheet, 3); i++)
             {
                 object neptunCodeValue = worksheet.Cells[i, 3].Value2;
                 if (neptunCodeValue == null)
@@ -190,6 +222,11 @@ namespace WindowsFormsApp1
                 MessageBox.Show("Please select an Excel file first.");
                 return;
             }
+            if (workbook2 == null || worksheet2 == null)
+            {
+                MessageBox.Show("Please select the output Excel file first.");
+                return;
+            }
             if (checkBox1.Checked)
             {
                 kiszhFunction();
@@ -202,6 +239,10 @@ namespace WindowsFormsApp1
             {
                 beadandoFunction();
             }
+            excelApp.DisplayAlerts = false;
+            workbook2.SaveAs(@"D:\Letöltések\Monitoring - Python_programozas_ANONIM_2.xlsx");
+            workbook2.Close(false);
+            excelApp.Quit();
         }
         
     }
