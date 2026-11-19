@@ -31,6 +31,7 @@ namespace WindowsFormsApp1
         Microsoft.Office.Interop.Excel.Application excelApp;
         private readonly Dictionary<string, StudentData> studentsByNeptun = new Dictionary<string, StudentData>();
         private double maxPointsGlobal = 0;
+        private int startingRow;
         public Form1()
         {
             InitializeComponent();
@@ -41,6 +42,20 @@ namespace WindowsFormsApp1
         {
             if (excelApp == null)
                 excelApp = new Microsoft.Office.Interop.Excel.Application();
+        }
+
+        private object GetCellValue(Worksheet sheet, int row, int col)
+        {
+            Range cell = (Range)sheet.Cells[row, col];
+
+            if ((bool)cell.MergeCells)
+            {
+                // Grab the top-left cell of the merged group block
+                Range firstCell = (Range)cell.MergeArea.Cells[1, 1];
+                return firstCell.Value2;
+            }
+
+            return cell.Value2;
         }
 
         private void openFileDialog1_FileOk(object sender, CancelEventArgs e)
@@ -165,7 +180,7 @@ namespace WindowsFormsApp1
             //beolvasom az oszlop szamait, majd feldolgozom az ertekeket
 
 
-            for (int i = 4; i <= GetLastPopulatedRow(worksheet, 3); i++)
+            for (int i = startingRow; i <= GetLastPopulatedRow(worksheet, 3); i++)
             {
                 //double currentPoints = 0;
                 object neptunCodeValue = worksheet.Cells[i, 3].Value2;
@@ -190,7 +205,7 @@ namespace WindowsFormsApp1
                     for (int j = startColumn; j <= endColumn; j = j + 2)
                     {
                         
-                        var cellValue = worksheet.Cells[i, j].Value2;
+                        var cellValue = GetCellValue(worksheet, i, j);
                         try
                         {
                             targetList.Add($"{cellValue}/{maxPoints[ind]}");
@@ -212,7 +227,7 @@ namespace WindowsFormsApp1
                 {
                     for (int j = startColumn; j <= endColumn; j++)
                     {
-                        var cellValue = worksheet.Cells[i, j].Value2;
+                        var cellValue = GetCellValue(worksheet, i, j);
                         try
                         {
                             targetList.Add($"{cellValue}/{maxPoints[j - startColumn]}");
@@ -287,6 +302,7 @@ namespace WindowsFormsApp1
 
         private void button3_Click(object sender, EventArgs e)
         {
+            startingRow = (int)numericUpDown7.Value;
             studentsByNeptun.Clear();
             maxPointsGlobal = 0;
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
