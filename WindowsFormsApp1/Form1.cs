@@ -1,14 +1,19 @@
-﻿using System;
+﻿using Microsoft.Office.Interop.Excel;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Microsoft.Office.Interop.Excel;
+using System.Xml.Serialization;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 
 namespace WindowsFormsApp1
 {
@@ -24,12 +29,18 @@ namespace WindowsFormsApp1
         Worksheet worksheet;
         Worksheet worksheet2;
         Microsoft.Office.Interop.Excel.Application excelApp;
-        private readonly Dictionary<string, List<object>> kisZhValuesByNeptunCode = new Dictionary<string, List<object>>();
-        private readonly Dictionary<string, List<object>> nagyZhValuesByNeptunCode = new Dictionary<string, List<object>>();
-        private readonly Dictionary<string, List<object>> beadandoValuesByNeptunCode = new Dictionary<string, List<object>>();
+        private readonly Dictionary<string, StudentData> studentsByNeptun = new Dictionary<string, StudentData>();
+        private double maxPointsGlobal = 0;
         public Form1()
         {
             InitializeComponent();
+            FormClosing += (sender, e) => ShutdownExcel();
+        }
+
+        private void EnsureExcelApp()
+        {
+            if (excelApp == null)
+                excelApp = new Microsoft.Office.Interop.Excel.Application();
         }
 
         private void openFileDialog1_FileOk(object sender, CancelEventArgs e)
@@ -44,7 +55,8 @@ namespace WindowsFormsApp1
             numericUpDown2.Visible = !numericUpDown2.Visible;
             label1.Visible = !label1.Visible;
             label4.Visible = !label4.Visible;
-            numericUpDown7.Visible = !numericUpDown7.Visible;
+            textBox2.Visible = !textBox2.Visible;
+            checkBox4.Visible = !checkBox4.Visible;
             kiszh = !kiszh;
         }
 
@@ -55,7 +67,8 @@ namespace WindowsFormsApp1
             numericUpDown6.Visible = !numericUpDown6.Visible;
             label3.Visible = !label3.Visible;
             label6.Visible = !label6.Visible;
-            numericUpDown9.Visible = !numericUpDown9.Visible;
+            textBox4.Visible = !textBox4.Visible;
+            checkBox6.Visible = !checkBox6.Visible;
             beadando = !beadando;
 
 
@@ -63,12 +76,13 @@ namespace WindowsFormsApp1
 
         private void checkBox2_CheckedChanged(object sender, EventArgs e)
         {
-            
+
             numericUpDown3.Visible = !numericUpDown3.Visible;
             numericUpDown4.Visible = !numericUpDown4.Visible;
             label2.Visible = !label2.Visible;
             label5.Visible = !label5.Visible;
-            numericUpDown8.Visible = !numericUpDown8.Visible;
+            textBox3.Visible = !textBox3.Visible;
+            checkBox5.Visible = !checkBox5.Visible;
             nagyzh = !nagyzh;
         }
 
@@ -86,8 +100,9 @@ namespace WindowsFormsApp1
             {
                 filePath = openFileDialog1.FileName;
                 readInitialExcelFile(filePath);
+                MessageBox.Show("Az adatok beolvasása megtörtént!");
             }
-            MessageBox.Show("Az adatok beolvasása megtörtént!");
+            
         }
         private void button2_Click_1(object sender, EventArgs e)
         {
@@ -98,26 +113,21 @@ namespace WindowsFormsApp1
             {
                 filePath2 = openFileDialog2.FileName;
                 readEndExcelFile(filePath2);
+                MessageBox.Show("Az adatok beolvasása megtörtént!");
             }
-            MessageBox.Show("Az adatok beolvasása megtörtént!");
+            
         }
-        private void readInitialExcelFile(string filePath)
+        private void readInitialExcelFile(string path)
         {
-            //fajlbol beolvasom a munkalapot
-            excelApp = new Microsoft.Office.Interop.Excel.Application();
-            workbook = excelApp.Workbooks.Open(filePath);
-            worksheet = workbook.Sheets[1];
-
-;
+            EnsureExcelApp();
+            workbook = excelApp.Workbooks.Open(path);
+            worksheet = (Worksheet)workbook.Worksheets[1];
         }
-        private void readEndExcelFile(string filePath2)
+        private void readEndExcelFile(string path2)
         {
-            //fajlbol beolvasom a munkalapot
-            excelApp = new Microsoft.Office.Interop.Excel.Application();
-            workbook2 = excelApp.Workbooks.Open(filePath2);
-            worksheet2 = workbook2.Sheets[1];
-
-
+            EnsureExcelApp();
+            workbook2 = excelApp.Workbooks.Open(path2);
+            worksheet2 = (Worksheet)workbook2.Worksheets[1];
         }
 
         private int GetLastPopulatedRow(Worksheet sheet, int column)
@@ -125,13 +135,39 @@ namespace WindowsFormsApp1
             return sheet.Cells[sheet.Rows.Count, column].End(XlDirection.xlUp).Row;
         }
 
-        private void copyFunction(Dictionary<string, List<object>> sourceValuesByNeptunCode, int startColumn, int endColumn, int maxPoints, bool isNagyZh = false)
+        private void PerformFunction(NumericUpDown startC, NumericUpDown endC, System.Windows.Forms.TextBox point, System.Windows.Forms.CheckBox percent, Func<StudentData, List<object>> targetListSelector)
+        {
+            int startColumn = (int)startC.Value;
+            int endColumn = (int)endC.Value;
+            int[] maxPoints = point.Text.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToArray();
+            if (maxPoints.Length == 1&& percent.Checked)
+            {
+                maxPointsGlobal += maxPoints[0] * (((endColumn - startColumn)/2) + 1);
+            }
+            else
+            {
+                maxPointsGlobal += maxPoints.Sum();
+            }
+
+            if (percent.Checked)
+            {
+                copyFunction(targetListSelector, startColumn, endColumn, maxPoints, true);
+            }
+            else
+            {
+                copyFunction(targetListSelector, startColumn, endColumn, maxPoints);
+            }
+
+        }
+
+        private void copyFunction(Func<StudentData, List<object>> getValues, int startColumn, int endColumn, int[] maxPoints, bool percentagePresent = false)
         {
             //beolvasom az oszlop szamait, majd feldolgozom az ertekeket
 
 
             for (int i = 4; i <= GetLastPopulatedRow(worksheet, 3); i++)
             {
+                //double currentPoints = 0;
                 object neptunCodeValue = worksheet.Cells[i, 3].Value2;
                 if (neptunCodeValue == null)
                 {
@@ -139,25 +175,64 @@ namespace WindowsFormsApp1
                 }
                 //elmentem a neptun kodot, hogyha mas sorrendbe lenne a kimenetbe, akkor is meg lehessen talalni mindent
                 string neptunCode = neptunCodeValue.ToString();
-                var values = new List<object>();
-                if (isNagyZh)
+
+                if (!studentsByNeptun.TryGetValue(neptunCode, out StudentData student))
                 {
-                    for (int j = startColumn; j <= endColumn; j=j+2)
+                    student = new StudentData();
+                    studentsByNeptun[neptunCode] = student;
+                }
+
+                var targetList = getValues(student);
+
+                if (percentagePresent)
+                {
+                    int ind = 0;
+                    for (int j = startColumn; j <= endColumn; j = j + 2)
                     {
-                        values.Add($"{worksheet.Cells[i, j].Value2}/{maxPoints}");
+                        
+                        var cellValue = worksheet.Cells[i, j].Value2;
+                        try
+                        {
+                            targetList.Add($"{cellValue}/{maxPoints[ind]}");
+                        }
+                        catch (IndexOutOfRangeException)
+                        {
+
+                            targetList.Add($"{cellValue}/{maxPoints[0]}");
+                        }
+                        student.TotalEarnedPoints += Convert.ToDouble(cellValue);
+                        if (cellValue == null || cellValue.ToString() == "0")
+                        {
+                            student.ZeroCount++;
+                        }
+                        ind++;
                     }
-                    sourceValuesByNeptunCode[neptunCode] = values;
                 }
                 else
                 {
                     for (int j = startColumn; j <= endColumn; j++)
                     {
-                        values.Add($"{worksheet.Cells[i, j].Value2}/{maxPoints}");
-                    }
-                    sourceValuesByNeptunCode[neptunCode] = values;
-                }
+                        var cellValue = worksheet.Cells[i, j].Value2;
+                        try
+                        {
+                            targetList.Add($"{cellValue}/{maxPoints[j - startColumn]}");
+                        }
+                        catch (IndexOutOfRangeException)
+                        {
 
+                            targetList.Add($"{cellValue}/{maxPoints[0]}");
+                        }
+                        ;
+                        student.TotalEarnedPoints += Convert.ToDouble(cellValue);
+                        if (cellValue == null || cellValue.ToString() == "0")
+                        {
+                            student.ZeroCount++;
+                        }
+                    }
+                }
+                student.PointPercentage = Math.Round((student.TotalEarnedPoints / maxPointsGlobal) * 100, 2);
             }
+            
             var destinationRowsByNeptunCode = new Dictionary<string, int>();
             int lastDestinationRow = GetLastPopulatedRow(worksheet2, 2);
             for (int i = 2; i <= lastDestinationRow; i++)
@@ -173,11 +248,11 @@ namespace WindowsFormsApp1
                 }
             }
             int columnOffset = 15;
-            foreach (var kvp in sourceValuesByNeptunCode)
+            foreach (var kvp in studentsByNeptun)
             {
                 if (destinationRowsByNeptunCode.TryGetValue(kvp.Key, out int destinationRow))
                 {
-                    List<object> values = kvp.Value;
+                    List<object> values = getValues(kvp.Value);
                     for (int j = 0; j < values.Count; j++)
                     {
                         while (worksheet2.Cells[destinationRow, columnOffset + j].Value2 != null)
@@ -194,40 +269,35 @@ namespace WindowsFormsApp1
 
         private void kiszhFunction()
         {
-            //beolvasom az oszlop szamait, majd feldolgozom az ertekeket
-            int startColumn = (int)numericUpDown1.Value;
-            int endColumn = (int)numericUpDown2.Value;
-            int maxPoints = (int)numericUpDown7.Value;
-            copyFunction(kisZhValuesByNeptunCode, startColumn, endColumn, maxPoints);
+            PerformFunction(numericUpDown1, numericUpDown2, textBox2, checkBox4, s => s.KisZhValues);
+
         }
-            
-        
+
+
         private void nagyzhFunction()
         {
-            //same as kiszh
-            int startColumn = (int)numericUpDown4.Value;
-            int endColumn = (int)numericUpDown3.Value;
-            int maxPoints = (int)numericUpDown8.Value;
-            copyFunction(nagyZhValuesByNeptunCode, startColumn, endColumn, maxPoints, true);
+           PerformFunction(numericUpDown4, numericUpDown3, textBox3, checkBox5, s => s.NagyZhValues);
         }
         private void beadandoFunction()
         {
-            //same as kiszh
-            int startColumn = (int)numericUpDown6.Value;
-            int endColumn = (int)numericUpDown5.Value;
-            int maxPoints = (int)numericUpDown9.Value;
-            copyFunction(beadandoValuesByNeptunCode, startColumn, endColumn, maxPoints);
+            PerformFunction(numericUpDown6, numericUpDown5, textBox4, checkBox6, s => s.BeadandoValues);
 
 
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
+            studentsByNeptun.Clear();
+            maxPointsGlobal = 0;
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             if (string.IsNullOrEmpty(filePath) || string.IsNullOrEmpty(filePath2))
             {
                 MessageBox.Show("Kérlek töltsd be mind a két filet!");
                 return;
             }
+            bool isAnySelected = panel1.Controls.OfType<System.Windows.Forms.RadioButton>().Any(rb => rb.Checked);
+
+            if (!isAnySelected){ MessageBox.Show("Kérlek válaszd ki a hetet!"); return; }
             if (checkBox1.Checked)
             {
                 kiszhFunction();
@@ -240,13 +310,227 @@ namespace WindowsFormsApp1
             {
                 beadandoFunction();
             }
+
+            
+
+            CalcIdk();
+
             excelApp.DisplayAlerts = false;
-            workbook2.SaveAs(@"D:\Letöltések\Monitoring - Python_programozas_ANONIM_2.xlsx");
-            workbook2.Close(false);
-            workbook.Close(false);
-            excelApp.Quit();
-            MessageBox.Show("Az adatok írása megtörtént!");
+            
+            try
+            {
+                SaveFileDialog saveFileDialog = new SaveFileDialog();
+                saveFileDialog.Filter = "Excel Files|*.xlsx;*.xlsm";
+                saveFileDialog.Title = @"Save Excel File" + " - " + timestamp;
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    workbook2.SaveAs(saveFileDialog.FileName);
+                }
+            }
+            finally
+            {
+                CloseCurrentWorkbooks();
+                MessageBox.Show("Az adatok írása megtörtént!");
+            }
+            
         }
-        
+
+        private void CalcIdk()
+        {
+            for (int i = 2; i <= GetLastPopulatedRow(worksheet2, 2); i++)
+            {
+                object neptunCodeValue = worksheet2.Cells[i, 2].Value2;
+                if (neptunCodeValue == null)
+                    continue;
+
+                string neptunCode = neptunCodeValue.ToString();
+
+
+                if (!studentsByNeptun.TryGetValue(neptunCode, out StudentData student))
+                    continue;
+
+                
+                var eval = new CheckedData
+                {
+                    PointPercentage = student.PointPercentage,
+                    ZeroCount = student.ZeroCount
+                };
+
+                var result = FormulaEvaluator.Evaluate(textBox1.Text, eval, -1);
+
+                System.Windows.Forms.RadioButton radioButton = panel1.Controls.OfType<System.Windows.Forms.RadioButton>().FirstOrDefault(rb => rb.Checked);
+                switch (radioButton?.Name)
+                {
+                    case "radioButton1":
+                        worksheet2.Cells[i, 9].Value2 = result;
+                        break;
+                    case "radioButton2":
+                        worksheet2.Cells[i, 10].Value2 = result;
+                        break;
+                    case "radioButton3":
+                        worksheet2.Cells[i, 11].Value2 = result;
+                        break;
+                    case "radioButton4":
+                        worksheet2.Cells[i, 12].Value2 = result;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        private void CloseCurrentWorkbooks()
+        {
+            if (workbook2 != null) workbook2.Close(false);
+            if (workbook != null) workbook.Close(false);
+
+            ReleaseComObject(worksheet2);
+            ReleaseComObject(worksheet);
+            ReleaseComObject(workbook2);
+            ReleaseComObject(workbook);
+
+            worksheet2 = null;
+            worksheet = null;
+            workbook2 = null;
+            workbook = null;
+        }
+
+        private void ShutdownExcel()
+        {
+            CloseCurrentWorkbooks();
+
+            if (excelApp != null)
+            {
+                excelApp.Quit();
+                ReleaseComObject(excelApp);
+                excelApp = null;
+            }
+        }
+
+        private static void ReleaseComObject(object comObject)
+        {
+            if (comObject != null && Marshal.IsComObject(comObject))
+                Marshal.ReleaseComObject(comObject);
+        }
+    }
+}
+
+
+
+
+
+
+public class CheckedData
+{
+    public double PointPercentage { get; set; }
+    public int ZeroCount { get; set; }
+}
+
+public class FormulaEvaluator
+{
+    public static readonly string[] AvailableKeywords =
+    {
+        "minp",
+        "allowz",
+    };
+
+    private class Rule
+    {
+        public int ReturnValue { get; set; }
+        public List<string> Conditions { get; set; } = new List<string>();
+    }
+
+    public static int Evaluate(string formula, CheckedData data, int defaultFallback = -1)
+    {
+        var rules = new List<Rule>();
+        var ruleMatches = Regex.Matches(formula, @"(\d+)\s*\(([^)]*)\)");
+
+        foreach (Match match in ruleMatches)
+        {
+            var rule = new Rule { ReturnValue = int.Parse(match.Groups[1].Value) };
+            string rawConditions = match.Groups[2].Value.Trim();
+
+            if (!string.IsNullOrEmpty(rawConditions))
+            {
+                rule.Conditions = rawConditions
+                    .Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(c => c.Trim())
+                    .ToList();
+            }
+            rules.Add(rule);
+        }
+
+        foreach (var rule in rules.OrderBy(r => r.Conditions.Count == 0))
+        {
+            if (rule.Conditions.All(cond => EvaluateSingleCondition(cond, data)))
+                return rule.ReturnValue;
+        }
+
+        return defaultFallback;
+    }
+
+    private static bool EvaluateSingleCondition(string condition, CheckedData data)
+    {
+        var varMatch = Regex.Match(condition, @"^([a-zA-Z_]+)");
+        if (!varMatch.Success) return false;
+
+        string keyword = varMatch.Groups[1].Value.ToLower();
+        string remainder = condition.Substring(keyword.Length);
+
+        var comparisons = Regex.Matches(remainder, @"([<>=!]+)\s*(\d+(?:\.\d+)?)");
+        if (comparisons.Count == 0) return false;
+
+        foreach (Match comp in comparisons)
+        {
+            string op = comp.Groups[1].Value;
+            double targetValue = double.Parse(comp.Groups[2].Value, CultureInfo.InvariantCulture);
+
+            if (!EvaluateKeyword(keyword, op, targetValue, data))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool EvaluateKeyword(string keyword, string op, double targetValue, CheckedData data)
+    {
+        switch (keyword)
+        {
+            case "minp":
+                return CompareNumbers(data.PointPercentage, op, targetValue);
+
+            case "allowz":
+                if (op == "=" || op == "==")
+                    return data.ZeroCount <= targetValue;
+
+                return CompareNumbers(data.ZeroCount, op, targetValue);
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool CompareNumbers(double actual, string op, double target)
+    {
+        switch (op)
+        {
+            case "<":
+                return actual < target;
+            case ">":
+                return actual > target;
+            case "=":
+            case "==":
+                return Math.Abs(actual - target) < 0.0001;
+            case "<=":
+            case "=<":
+                return actual <= target;
+            case ">=":
+            case "=>":
+                return actual >= target;
+            case "!=":
+                return Math.Abs(actual - target) >= 0.0001;
+            default:
+                return false;
+        }
     }
 }
