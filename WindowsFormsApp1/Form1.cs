@@ -199,7 +199,7 @@ namespace WindowsFormsApp1
 
             
 
-            CalcIdk();
+            CalcWeek();
 
             excelApp.DisplayAlerts = false;
             
@@ -221,11 +221,11 @@ namespace WindowsFormsApp1
             
         }
 
-        private void CalcIdk()
+        private void CalcWeek()
         {
             for (int i = 2; i <= GetLastPopulatedRow(worksheet2, 2); i++)
             {
-                object neptunCodeValue = worksheet2.Cells[i, 2].Value2;
+                object neptunCodeValue = GetCellValue(worksheet2, i, 2);
                 if (neptunCodeValue == null)
                     continue;
 
@@ -242,26 +242,50 @@ namespace WindowsFormsApp1
                     ZeroCount = student.ZeroCount
                 };
 
-                var result = FormulaEvaluator.Evaluate(textBox1.Text, eval, -1);
+                var result = FormulaEvaluator.Evaluate(EvaluateType.weekly, textBox1.Text, eval, -1);
 
                 System.Windows.Forms.RadioButton radioButton = panel1.Controls.OfType<System.Windows.Forms.RadioButton>().FirstOrDefault(rb => rb.Checked);
                 switch (radioButton?.Name)
                 {
                     case "radioButton1":
-                        worksheet2.Cells[i, 9].Value2 = result;
+                        GetCellValue(worksheet2, i, 9) = result;
+                        student.WeeklyPerformance[0] = result;
                         break;
                     case "radioButton2":
-                        worksheet2.Cells[i, 10].Value2 = result;
+                        GetCellValue(worksheet2, i, 10) = result;
+                        student.WeeklyPerformance[1] = result;
                         break;
                     case "radioButton3":
-                        worksheet2.Cells[i, 11].Value2 = result;
+                        GetCellValue(worksheet2, i, 11) = result;
+                        student.WeeklyPerformance[2] = result;
                         break;
                     case "radioButton4":
-                        worksheet2.Cells[i, 12].Value2 = result;
+                        GetCellValue(worksheet2, i, 12) = result;
+                        student.WeeklyPerformance[3] = result;
                         break;
                     default:
                         break;
                 }
+            }
+        }
+
+        public void CalcSignature()
+        {
+            for (int i = 2; i <= GetLastPopulatedRow(worksheet2, 2); i++)
+            {
+                object neptunCodeValue = GetCellValue(worksheet2, i, 2);
+                if (neptunCodeValue == null)
+                    continue;
+                string neptunCode = neptunCodeValue.ToString();
+                if (!studentsByNeptun.TryGetValue(neptunCode, out StudentData student))
+                    continue;
+                var eval = new CheckedData
+                {
+                    PointPercentage = student.PointPercentage,
+                    ZeroCount = student.ZeroCount
+                };
+                var result = FormulaEvaluator.Evaluate(EvaluateType.signature, textBox7.Text, eval, -1);
+                GetCellValue(worksheet2,i,13) = result;
             }
         }
 
@@ -297,6 +321,14 @@ namespace WindowsFormsApp1
         {
             if (comObject != null && Marshal.IsComObject(comObject))
                 Marshal.ReleaseComObject(comObject);
+        }
+
+        private void radioButton4_CheckedChanged(object sender, EventArgs e)
+        {
+            label8.Visible = !label8.Visible;
+            label9.Visible = !label9.Visible;
+            textBox5.Visible = !textBox5.Visible;
+            textBox6.Visible = !textBox6.Visible;
         }
     }
 }

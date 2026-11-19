@@ -14,7 +14,12 @@ namespace WindowsFormsApp1
         {
         "minp",
         "allowz",
-    };
+        "weekly0",
+        "weekly1",
+        "weekly2",
+        "weekly3",
+        "weekly4",
+        };
 
         private class Rule
         {
@@ -22,14 +27,43 @@ namespace WindowsFormsApp1
             public List<string> Conditions { get; set; } = new List<string>();
         }
 
-        public static int Evaluate(string formula, CheckedData data, int defaultFallback = -1)
+        private class Rule2
+        { 
+            public string Signature { get; set; }
+            public List<string> Conditions { get; set; } = new List<string>();
+        }
+
+        public static int Evaluate(EvaluateType type, string formula, CheckedData data, int defaultFallback = -1)
         {
             var rules = new List<Rule>();
-            var ruleMatches = Regex.Matches(formula, @"(\d+)\s*\(([^)]*)\)");
+            switch (type)
+            {
+                case EvaluateType.weekly:
+                    var ruleMatches = Regex.Matches(formula, @"(\d+)\s*\(([^)]*)\)");
+                    break;
+                case EvaluateType.final:
+                    var ruleMatches = Regex.Matches(formula, @"(\d+)\s*\(([^)]*)\)");
+                    break;
+                case EvaluateType.signature:
+                    var ruleMatches = Regex.Matches(formula, @"[A-Za-z]+\([^)]*\)");
+                    break;
+                default:
+                    throw new ArgumentException("Invalid evaluation type.");
+            }
+           
 
             foreach (Match match in ruleMatches)
             {
-                var rule = new Rule { ReturnValue = int.Parse(match.Groups[1].Value) };
+                if (type == EvaluateType.weekly|| type == EvaluateType.final)
+                {
+                    var rule = new Rule { ReturnValue = int.Parse(match.Groups[1].Value) };
+                }
+                else
+                {
+                    var rule = new Rule2 { Signature = match.Groups[1].Value };
+
+                }
+
                 string rawConditions = match.Groups[2].Value.Trim();
 
                 if (!string.IsNullOrEmpty(rawConditions))
@@ -42,18 +76,21 @@ namespace WindowsFormsApp1
                 rules.Add(rule);
             }
 
-            foreach (var rule in rules.OrderBy(r => r.Conditions.Count == 0))
+            if (type == EvaluateType.weekly || type==EvaluateType.final)
             {
-                if (rule.Conditions.All(cond => EvaluateSingleCondition(cond, data)))
-                    return rule.ReturnValue;
-            }
+                foreach (var rule in rules.OrderBy(r => r.Conditions.Count == 0))
+                {
+                    if (rule.Conditions.All(cond => EvaluateSingleCondition(cond, data)))
+                        return rule.ReturnValue;
+                }
+            }            
 
             return defaultFallback;
         }
 
         private static bool EvaluateSingleCondition(string condition, CheckedData data)
         {
-            var varMatch = Regex.Match(condition, @"^([a-zA-Z_]+)");
+            var varMatch = Regex.Match(condition, @"^([a-zA-Z_][a-zA-Z_0-9]*)");
             if (!varMatch.Success) return false;
 
             string keyword = varMatch.Groups[1].Value.ToLower();
@@ -86,9 +123,15 @@ namespace WindowsFormsApp1
                         return data.ZeroCount <= targetValue;
 
                     return CompareNumbers(data.ZeroCount, op, targetValue);
-
                 default:
-                    return false;
+                    var weeklyGradeMatch = Regex.Match(keyword, @"^weekly([0-4])$");
+                    if (!weeklyGradeMatch.Success)
+                        return false;
+
+                    int weeklyGrade = int.Parse(weeklyGradeMatch.Groups[1].Value);
+                    int count = data.WeeklyPerformance.Count(value => value == weeklyGrade);
+
+                    return CompareNumbers(count, op, targetValue);
             }
         }
 
