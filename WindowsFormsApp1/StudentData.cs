@@ -16,4 +16,10 @@ namespace WindowsFormsApp1
         public double PointPercentage { get; set; } = 0;
         public int ZeroCount { get; set; } = 0;
     }
+
+    public class CheckedData
+    {
+        public double PointPercentage { get; set; }
+        public int ZeroCount { get; set; }
+    }
 }

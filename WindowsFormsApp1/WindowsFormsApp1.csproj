@@ -46,6 +46,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Copy_StoreData.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormulaEvaluator.cs" />
     <Compile Include="StudentData.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
