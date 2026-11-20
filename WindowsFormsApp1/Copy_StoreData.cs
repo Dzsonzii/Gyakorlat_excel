@@ -19,9 +19,22 @@ namespace WindowsFormsApp1
             {
                 maxPointsGlobal += maxPoints[0] * (((endColumn - startColumn) / 2) + 1);
             }
+            else if(maxPoints.Length>1)
+            {
+                int columnCount = percent.Checked ? ((endColumn - startColumn) / 2) + 1 : (endColumn - startColumn) + 1;
+                if (maxPoints.Length != columnCount)
+                {
+                    MessageBox.Show("Nincs minden oszzlopnak maximális pontszám megadva");
+                    return;
+                }
+                else
+                {
+                    maxPointsGlobal += maxPoints.Sum();
+                }
+            }
             else
             {
-                maxPointsGlobal += maxPoints.Sum();
+                maxPointsGlobal += maxPoints[0] * (endColumn - startColumn + 1);
             }
 
             if (percent.Checked)

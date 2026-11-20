@@ -197,9 +197,20 @@ namespace WindowsFormsApp1
                 beadandoFunction();
             }
 
-            
 
-            CalcWeek();
+
+            try
+            {
+                CalcWeek();
+                CalcSignature();
+                CalcFinal();
+            }
+            catch (Exception)
+            {
+
+                MessageBox.Show("Valami hibát észleltünk, a művelet nem történt meg!");
+                return;
+            }
 
             excelApp.DisplayAlerts = false;
             
