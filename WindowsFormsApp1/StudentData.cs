@@ -11,7 +11,6 @@ namespace WindowsFormsApp1
         public List<object> KisZhValues { get; set; } = new List<object>();
         public List<object> NagyZhValues { get; set; } = new List<object>();
         public List<object> BeadandoValues { get; set; } = new List<object>();
-        public List<int> WeeklyPerformance { get; set; } = new List<int> {0,0,0,0};
 
         public double TotalEarnedPoints { get; set; } = 0;
         public double PointPercentage { get; set; } = 0;
@@ -22,6 +21,7 @@ namespace WindowsFormsApp1
     {
         public double PointPercentage { get; set; }
         public int ZeroCount { get; set; }
+        public List<int> WeeklyPerformance { get; set; } = new List<int> { 0, 0, 0, 0 };
     }
 
     public enum EvaluateType

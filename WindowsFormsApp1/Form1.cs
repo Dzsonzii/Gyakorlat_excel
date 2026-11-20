@@ -225,7 +225,7 @@ namespace WindowsFormsApp1
         {
             for (int i = 2; i <= GetLastPopulatedRow(worksheet2, 2); i++)
             {
-                object neptunCodeValue = GetCellValue(worksheet2, i, 2);
+                object neptunCodeValue = worksheet2.Cells[i, 2].Value2;
                 if (neptunCodeValue == null)
                     continue;
 
@@ -241,31 +241,33 @@ namespace WindowsFormsApp1
                     PointPercentage = student.PointPercentage,
                     ZeroCount = student.ZeroCount
                 };
-
-                var result = FormulaEvaluator.Evaluate(EvaluateType.weekly, textBox1.Text, eval, -1);
-
-                System.Windows.Forms.RadioButton radioButton = panel1.Controls.OfType<System.Windows.Forms.RadioButton>().FirstOrDefault(rb => rb.Checked);
-                switch (radioButton?.Name)
+                try
                 {
-                    case "radioButton1":
-                        GetCellValue(worksheet2, i, 9) = result;
-                        student.WeeklyPerformance[0] = result;
-                        break;
-                    case "radioButton2":
-                        GetCellValue(worksheet2, i, 10) = result;
-                        student.WeeklyPerformance[1] = result;
-                        break;
-                    case "radioButton3":
-                        GetCellValue(worksheet2, i, 11) = result;
-                        student.WeeklyPerformance[2] = result;
-                        break;
-                    case "radioButton4":
-                        GetCellValue(worksheet2, i, 12) = result;
-                        student.WeeklyPerformance[3] = result;
-                        break;
-                    default:
-                        break;
+                    var result = FormulaEvaluator.Evaluate(EvaluateType.weekly, textBox1.Text, eval, -1);
+                    System.Windows.Forms.RadioButton radioButton = panel1.Controls.OfType<System.Windows.Forms.RadioButton>().FirstOrDefault(rb => rb.Checked);
+                    switch (radioButton?.Name)
+                    {
+                        case "radioButton1":
+                            worksheet2.Cells[i, 9].Value2 = result;
+                            break;
+                        case "radioButton2":
+                            worksheet2.Cells[i, 10].Value2 = result;
+                            break;
+                        case "radioButton3":
+                            worksheet2.Cells[i, 11].Value2 = result;
+                            break;
+                        case "radioButton4":
+                            worksheet2.Cells[i, 12].Value2 = result;
+                            break;
+                        default:
+                            break;
+                    }
                 }
+                catch (Exception)
+                {
+                    MessageBox.Show("Valami hibát észleltünk, a művelet nem történt meg!");
+                }
+                
             }
         }
 
@@ -273,20 +275,58 @@ namespace WindowsFormsApp1
         {
             for (int i = 2; i <= GetLastPopulatedRow(worksheet2, 2); i++)
             {
-                object neptunCodeValue = GetCellValue(worksheet2, i, 2);
+                object neptunCodeValue = worksheet2.Cells[i, 2].Value2;
                 if (neptunCodeValue == null)
                     continue;
                 string neptunCode = neptunCodeValue.ToString();
                 if (!studentsByNeptun.TryGetValue(neptunCode, out StudentData student))
                     continue;
+
                 var eval = new CheckedData
                 {
-                    PointPercentage = student.PointPercentage,
-                    ZeroCount = student.ZeroCount
+                    WeeklyPerformance = new List<int> { Convert.ToInt32(GetCellValue(worksheet2, i, 9)), Convert.ToInt32(GetCellValue(worksheet2, i, 10)), Convert.ToInt32(GetCellValue(worksheet2, i, 11)), Convert.ToInt32(GetCellValue(worksheet2, i, 12)) }
                 };
-                var result = FormulaEvaluator.Evaluate(EvaluateType.signature, textBox7.Text, eval, -1);
-                GetCellValue(worksheet2,i,13) = result;
+                try
+                {
+                    var result = FormulaEvaluator.Evaluate(EvaluateType.signature, textBox5.Text, eval, "Nem");
+                    worksheet2.Cells[i, 13].Value2 = result;
+                }
+                catch (Exception)
+                {
+                    MessageBox.Show("Valami hibát észleltünk, a művelet nem történt meg!");
+                }
+                
             }
+        }
+
+        public void CalcFinal()
+        {
+            for (int i = 2; i <= GetLastPopulatedRow(worksheet2, 2); i++)
+            {
+                object neptunCodeValue = worksheet2.Cells[i, 2].Value2;
+                if (neptunCodeValue == null)
+                    continue;
+                string neptunCode = neptunCodeValue.ToString();
+                if (!studentsByNeptun.TryGetValue(neptunCode, out StudentData student))
+                    continue;
+
+                var eval = new CheckedData
+                {
+                    WeeklyPerformance = new List<int> { Convert.ToInt32(GetCellValue(worksheet2, i, 9)), Convert.ToInt32(GetCellValue(worksheet2, i, 10)), Convert.ToInt32(GetCellValue(worksheet2, i, 11)), Convert.ToInt32(GetCellValue(worksheet2, i, 12)) }
+                };
+                try
+                {
+                    var result = FormulaEvaluator.Evaluate(EvaluateType.final, textBox6.Text, eval, -1);
+                    worksheet2.Cells[i, 14].Value2 = result;
+                }
+                catch (Exception)
+                {
+
+                    MessageBox.Show("Valami hibát észleltünk, a művelet nem történt meg!");
+                }
+                
+            }
+
         }
 
         private void CloseCurrentWorkbooks()

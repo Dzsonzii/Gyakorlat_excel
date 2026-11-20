@@ -33,57 +33,48 @@ namespace WindowsFormsApp1
             public List<string> Conditions { get; set; } = new List<string>();
         }
 
-        public static int Evaluate(EvaluateType type, string formula, CheckedData data, int defaultFallback = -1)
+        public static int Evaluate(
+    EvaluateType type,
+    string formula,
+    CheckedData data,
+    int defaultFallback = -1)
         {
-            var rules = new List<Rule>();
-            switch (type)
+            if (type == EvaluateType.signature)
+                throw new ArgumentException("Use a string fallback for signature formulas.");
+
+            string result = EvaluateCore(
+                formula, data, defaultFallback.ToString(CultureInfo.InvariantCulture));
+
+            return int.Parse(result, CultureInfo.InvariantCulture);
+        }
+
+        public static string Evaluate(
+            EvaluateType type,
+            string formula,
+            CheckedData data,
+            string defaultFallback)
+        {
+            if (type != EvaluateType.signature)
+                throw new ArgumentException("Use an integer fallback for numeric formulas.");
+
+            return EvaluateCore(formula, data, defaultFallback);
+        }
+
+        private static string EvaluateCore(string formula, CheckedData data, string defaultFallback)
+        {
+            var matches = Regex.Matches(formula, @"([^()]+)\s*\(([^()]*)\)")
+                .Cast<Match>()
+                .OrderBy(match => string.IsNullOrWhiteSpace(match.Groups[2].Value));
+
+            foreach (Match match in matches)
             {
-                case EvaluateType.weekly:
-                    var ruleMatches = Regex.Matches(formula, @"(\d+)\s*\(([^)]*)\)");
-                    break;
-                case EvaluateType.final:
-                    var ruleMatches = Regex.Matches(formula, @"(\d+)\s*\(([^)]*)\)");
-                    break;
-                case EvaluateType.signature:
-                    var ruleMatches = Regex.Matches(formula, @"[A-Za-z]+\([^)]*\)");
-                    break;
-                default:
-                    throw new ArgumentException("Invalid evaluation type.");
+                var conditions = match.Groups[2].Value
+                    .Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(condition => condition.Trim());
+
+                if (conditions.All(condition => EvaluateSingleCondition(condition, data)))
+                    return match.Groups[1].Value.Trim().Trim(',', ';').Trim();
             }
-           
-
-            foreach (Match match in ruleMatches)
-            {
-                if (type == EvaluateType.weekly|| type == EvaluateType.final)
-                {
-                    var rule = new Rule { ReturnValue = int.Parse(match.Groups[1].Value) };
-                }
-                else
-                {
-                    var rule = new Rule2 { Signature = match.Groups[1].Value };
-
-                }
-
-                string rawConditions = match.Groups[2].Value.Trim();
-
-                if (!string.IsNullOrEmpty(rawConditions))
-                {
-                    rule.Conditions = rawConditions
-                        .Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)
-                        .Select(c => c.Trim())
-                        .ToList();
-                }
-                rules.Add(rule);
-            }
-
-            if (type == EvaluateType.weekly || type==EvaluateType.final)
-            {
-                foreach (var rule in rules.OrderBy(r => r.Conditions.Count == 0))
-                {
-                    if (rule.Conditions.All(cond => EvaluateSingleCondition(cond, data)))
-                        return rule.ReturnValue;
-                }
-            }            
 
             return defaultFallback;
         }
@@ -94,7 +85,7 @@ namespace WindowsFormsApp1
             if (!varMatch.Success) return false;
 
             string keyword = varMatch.Groups[1].Value.ToLower();
-            string remainder = condition.Substring(keyword.Length);
+            string remainder = condition.Substring(keyword.Length).Replace(',', '.');
 
             var comparisons = Regex.Matches(remainder, @"([<>=!]+)\s*(\d+(?:\.\d+)?)");
             if (comparisons.Count == 0) return false;
