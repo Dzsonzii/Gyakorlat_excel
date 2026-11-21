@@ -81,12 +81,12 @@ namespace WindowsFormsApp1
                         var cellValue = GetCellValue(worksheet, i, j);
                         try
                         {
-                            targetList.Add($"{cellValue}/{maxPoints[ind]}");
+                            targetList.Add($"{cellValue ?? 0}/{maxPoints[ind]}");
                         }
                         catch (IndexOutOfRangeException)
                         {
 
-                            targetList.Add($"{cellValue}/{maxPoints[0]}");
+                            targetList.Add($"{cellValue ?? 0}/{maxPoints[0]}");
                         }
                         student.TotalEarnedPoints += Convert.ToDouble(cellValue);
                         if (cellValue == null || cellValue.ToString() == "0")
@@ -103,12 +103,12 @@ namespace WindowsFormsApp1
                         var cellValue = GetCellValue(worksheet, i, j);
                         try
                         {
-                            targetList.Add($"{cellValue}/{maxPoints[j - startColumn]}");
+                            targetList.Add($"{cellValue ?? 0}/{maxPoints[j - startColumn]}");
                         }
                         catch (IndexOutOfRangeException)
                         {
 
-                            targetList.Add($"{cellValue}/{maxPoints[0]}");
+                            targetList.Add($"{cellValue ?? 0}/{maxPoints[0]}");
                         }
                         ;
                         student.TotalEarnedPoints += Convert.ToDouble(cellValue);

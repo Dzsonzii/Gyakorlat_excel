@@ -202,8 +202,11 @@ namespace WindowsFormsApp1
             try
             {
                 CalcWeek();
-                CalcSignature();
-                CalcFinal();
+                if (radioButton4.Checked)
+                {
+                    CalcSignature();
+                    CalcFinal();
+                }
             }
             catch (Exception)
             {
