@@ -147,7 +147,8 @@ namespace WindowsFormsApp1
                         {
                             columnOffset++;
                         }
-                        worksheet2.Cells[destinationRow, columnOffset + j].Value2 = values[j];
+                        worksheet2.Cells[destinationRow, columnOffset + j].numberFormat = "@";
+                        worksheet2.Cells[destinationRow, columnOffset + j].Value2 = "'" + values[j];
                     }
                 }
                 columnOffset = 15;
